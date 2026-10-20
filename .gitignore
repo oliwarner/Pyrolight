@@ -7,3 +7,21 @@ build/
 libs/
 config.tests/*/.qmake.stash
 config.tests/*/Makefile
+
+# qmake build outputs for native Linux builds
+/.qmake.cache
+/.qmake.stash
+/Makefile
+/config.log
+/app/Makefile*
+/app/pyrolight
+/app/release/
+/h264bitstream/Makefile*
+/h264bitstream/*.a
+/h264bitstream/release/
+/moonlight-common-c/Makefile*
+/moonlight-common-c/*.a
+/moonlight-common-c/release/
+/qmdnsengine/Makefile*
+/qmdnsengine/*.a
+/qmdnsengine/release/

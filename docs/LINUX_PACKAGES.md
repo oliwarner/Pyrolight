@@ -1,30 +1,37 @@
 # Linux distribution packages
 
-Every release ships the AppImage and three packages built from the same
-payload: `pyrolight_<version>-1_amd64.deb`, `pyrolight-<version>-1.x86_64.rpm`
-and `pyrolight-<version>-1-x86_64.pkg.tar.zst`. This document describes their
-layout, dependencies and icon handling.
+Every release ships the x86_64 AppImage and its Debian, RPM and Arch packages,
+plus a native ARM64 Ubuntu package: `pyrolight_<version>-1_arm64.deb`. The x86_64
+packages share the verified AppImage payload; the ARM64 package links to Ubuntu
+runtime libraries and bundles PyroWave. This document describes their layout,
+dependencies and icon handling.
 
 ## Layout
 
-Pyrolight needs pinned SDL3, sdl2-compat, FFmpeg, libplacebo and PyroWave builds
-that distributions do not ship, so the packages install the AppImage payload
-instead of linking distribution libraries.
+The x86_64 packages install the verified AppImage payload, which includes
+pinned SDL3, sdl2-compat, FFmpeg, libplacebo and PyroWave builds. The ARM64
+package is built natively on Ubuntu 24.04 and uses Ubuntu's Qt, SDL2, FFmpeg and
+libplacebo libraries; it bundles the pinned PyroWave runtime under
+`/opt/pyrolight/lib`.
 
 | Path | Content |
 | --- | --- |
-| `/opt/pyrolight/` | The extracted, verified AppImage (bundled Qt, SDL, FFmpeg, libplacebo, PyroWave, the libwayland-client and libva fallbacks and their probes) |
+| `/opt/pyrolight/` | For x86_64 packages, the extracted verified AppImage payload and its graphics-stack fallbacks |
+| `/opt/pyrolight/bin/pyrolight`, `/opt/pyrolight/lib/` | ARM64 executable and bundled PyroWave runtime |
 | `/usr/bin/pyrolight` | Launcher that runs `/opt/pyrolight/AppRun`, so the host-library probes in [LINUX_DISPLAY.md](LINUX_DISPLAY.md#appimage-packaging-boundary) apply unchanged |
 | `/usr/share/applications/com.moonlight_stream.Moonlight.desktop` | Desktop entry (`Name=Pyrolight`, `Icon=pyrolight`) |
 | `/usr/share/icons/hicolor/scalable/apps/pyrolight.svg` | Pyrolight icon |
 | `/usr/share/metainfo/com.moonlight_stream.Moonlight.appdata.xml` | AppStream metadata |
 | `/usr/share/licenses/pyrolight/`, `/usr/share/doc/pyrolight/` | Pyrolight and PyroWave licenses (per-distribution location) |
 
-`scripts/build-linux-packages.sh` stages these from an AppDir, makes the payload
-world-readable (AppImage directories are mode 0700), checks the icons and runs
-nfpm with [app/deploy/linux/nfpm.yaml](../app/deploy/linux/nfpm.yaml) for each
-format. The release workflow builds them from the AppImage it has just
-verified.
+`scripts/build-linux-packages.sh` stages the x86_64 packages from an AppDir,
+makes the payload world-readable (AppImage directories are mode 0700), checks
+the icons and runs nfpm with [app/deploy/linux/nfpm.yaml](../app/deploy/linux/nfpm.yaml).
+The release workflow builds these packages from the AppImage it has just
+verified. `scripts/build-linux-deb.sh` packages the native ARM64 executable,
+derives its shared-library dependencies with `dpkg-shlibdeps`, and uses
+`app/version.txt` unless `CI_VERSION` or `VERSION` overrides it. The release
+workflow builds this package on an ARM64 Ubuntu 24.04 runner.
 
 ## Dependencies
 
@@ -81,6 +88,18 @@ Build and check the packages from an extracted AppImage:
 scripts/check-linux-icons.sh squashfs-root
 VERSION=6.2.1 scripts/build-linux-packages.sh squashfs-root build/packages
 ```
+
+The release workflow builds the ARM64 Ubuntu package natively on an ARM64
+Ubuntu runner. To package an existing ARM64 build locally, first install
+PyroWave to `build/pyrowave-install`, then run:
+
+```sh
+scripts/build-linux-deb.sh build/arm64/app/pyrolight build/pyrowave-install build/packages
+```
+
+The script defaults to `app/version.txt`; set `CI_VERSION` or `VERSION` to
+override it. `dpkg-shlibdeps` derives runtime library dependencies from the
+build environment.
 
 Install each package on a clean system of its family, then check that every
 bundled library resolves, that `pyrolight` starts (the log shows

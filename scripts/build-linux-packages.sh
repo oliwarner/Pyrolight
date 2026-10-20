@@ -4,7 +4,8 @@
 # packages install that payload in /opt/pyrolight; see
 # app/deploy/linux/nfpm.yaml and docs/LINUX_DISPLAY.md.
 #
-# Usage: VERSION=6.2.1 scripts/build-linux-packages.sh <AppDir> <output-dir>
+# Usage: scripts/build-linux-packages.sh <AppDir> <output-dir>
+# Set VERSION or CI_VERSION to override the version in app/version.txt.
 # Requires nfpm (see .github/workflows/build-appimage.yml for the pinned version).
 
 set -euo pipefail
@@ -15,11 +16,11 @@ fail()
   exit 1
 }
 
-[ $# -eq 2 ] || fail "Usage: VERSION=<version> $0 <AppDir> <output-dir>"
-: "${VERSION:?Set VERSION to the numeric release version}"
+[ $# -eq 2 ] || fail "Usage: $0 <AppDir> <output-dir>"
+SOURCE_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+VERSION=${VERSION:-${CI_VERSION:-$(<"$SOURCE_ROOT/app/version.txt")}}
 command -v nfpm >/dev/null 2>&1 || fail "Unable to find 'nfpm' in your PATH!"
 
-SOURCE_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 APPDIR=$(readlink -f "$1")
 mkdir -p "$2"
 OUTPUT=$(readlink -f "$2")
@@ -27,6 +28,12 @@ STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 
 [ -x "$APPDIR/AppRun" ] && [ -x "$APPDIR/usr/bin/pyrolight" ] || fail "$APPDIR is not a Pyrolight AppDir"
+ELF_MACHINE=$(LC_ALL=C readelf -h "$APPDIR/usr/bin/pyrolight" | sed -n 's/^[[:space:]]*Machine:[[:space:]]*//p')
+case "$ELF_MACHINE" in
+  "Advanced Micro Devices X86-64") NFPM_ARCH=amd64 ;;
+  AArch64) NFPM_ARCH=arm64 ;;
+  *) fail "Unsupported AppDir architecture: ${ELF_MACHINE:-unknown}" ;;
+esac
 
 echo Staging packages from $APPDIR
 mkdir -p "$STAGE/opt" "$STAGE/usr/bin" "$STAGE/usr/share/applications" \
@@ -49,7 +56,7 @@ cp "$APPDIR"/usr/share/licenses/pyrolight/*-LICENSE "$STAGE/licenses/"
 
 cd "$STAGE"
 for packager in deb rpm archlinux; do
-  VERSION=$VERSION nfpm package --config "$SOURCE_ROOT/app/deploy/linux/nfpm.yaml" \
+  VERSION=$VERSION NFPM_ARCH=$NFPM_ARCH nfpm package --config "$SOURCE_ROOT/app/deploy/linux/nfpm.yaml" \
     --packager "$packager" --target "$OUTPUT/" || fail "nfpm $packager failed!"
 done
 

@@ -17,6 +17,94 @@ permissions:
   contents: read
 
 jobs:
+  arm64-deb:
+    name: Linux ARM64 Ubuntu package
+    runs-on: ubuntu-24.04-arm
+    env:
+      CI_VERSION: ${{ inputs.release_version }}
+
+    steps:
+      - name: Check out Pyrolight
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out the patched PyroWave API
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: karsyboy/pyrowave
+          ref: b09e1365155e91710497be22eac6500f04bf74ea
+          path: deps/PyroWave
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Add the Vulkan SDK repository
+        run: |
+          set -euo pipefail
+          curl -fsSL https://packages.lunarg.com/lunarg-signing-key-pub.asc \
+            | gpg --dearmor \
+            | sudo tee /usr/share/keyrings/lunarg-vulkan.gpg >/dev/null
+          echo 'deb [signed-by=/usr/share/keyrings/lunarg-vulkan.gpg] https://packages.lunarg.com/vulkan/1.4.313 noble main' \
+            | sudo tee /etc/apt/sources.list.d/lunarg-vulkan.list >/dev/null
+
+      - name: Install build and runtime dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            cmake pkg-config qmake6 qt6-base-dev qt6-base-private-dev \
+            qt6-declarative-dev libqt6svg6-dev qt6-wayland qt6-qpa-plugins \
+            qml6-module-qtquick qml6-module-qtquick-controls \
+            qml6-module-qtquick-templates qml6-module-qtquick-layouts \
+            qml6-module-qtqml-workerscript qml6-module-qtquick-window \
+            libssl-dev libsdl2-dev libsdl2-ttf-dev libopus-dev \
+            libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
+            libva-dev libvdpau-dev libdrm-dev libplacebo-dev libvulkan-dev vulkan-headers \
+            libwayland-dev libx11-dev libegl-dev libgl-dev
+
+      - name: Build and install PyroWave
+        run: |
+          set -euo pipefail
+          (cd deps/PyroWave && ./checkout_granite.sh)
+          test "$(git -C deps/PyroWave/Granite rev-parse HEAD)" = fb178c8080d163419e8d20f10715c61c53c1ec9b
+          cmake -S deps/PyroWave -B build/pyrowave \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$PWD/build/pyrowave-install" \
+            -DPYROWAVE_DEVEL=OFF -DPYROWAVE_UTILS=OFF
+          cmake --build build/pyrowave --parallel
+          cmake --install build/pyrowave
+          mkdir -p build/pyrowave-install/share/licenses/pyrowave
+          install -m 0644 deps/PyroWave/LICENSE build/pyrowave-install/share/licenses/pyrowave/LICENSE
+
+      - name: Build Pyrolight
+        run: |
+          set -euo pipefail
+          export PKG_CONFIG_PATH="$PWD/build/pyrowave-install/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+          mkdir -p build/arm64
+          cd build/arm64
+          qmake6 ../../moonlight-qt.pro CONFIG+=release CONFIG+=enable-pyrowave
+          make -j"$(nproc)"
+          readelf -d app/pyrolight | grep -F 'libpyrowave-shared.so.1'
+
+      - name: Build and verify the ARM64 .deb
+        run: |
+          set -euo pipefail
+          scripts/build-linux-deb.sh build/arm64/app/pyrolight build/pyrowave-install build/packages
+          package="build/packages/pyrolight_${CI_VERSION}-1_arm64.deb"
+          test "$(dpkg-deb --field "$package" Architecture)" = arm64
+          test "$(dpkg-deb --field "$package" Version)" = "${CI_VERSION}-1"
+          mkdir -p release-assets
+          cp "$package" release-assets/
+
+      - name: Upload ARM64 release artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: pyrolight-${{ inputs.release_tag }}-linux-arm64-deb
+          path: release-assets/*.deb
+          if-no-files-found: error
+
   appimage:
     name: Linux x86_64 AppImage
     runs-on: ubuntu-22.04

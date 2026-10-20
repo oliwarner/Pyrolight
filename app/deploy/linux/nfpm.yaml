@@ -9,7 +9,7 @@
 # drivers) comes from the distribution, as with the AppImage.
 
 name: pyrolight
-arch: amd64 # nfpm maps this to the native architecture for each packager.
+arch: ${NFPM_ARCH}
 platform: linux
 version: ${VERSION}
 release: "1"

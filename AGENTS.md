@@ -48,7 +48,7 @@ Related repositories:
 | `app/tests/` | Renderer smoke test and streaming-preferences Qt test |
 | `scripts/build-pyrowave-appimage.sh` | Pinned PyroWave AppImage build |
 | `scripts/build-appimage.sh`, `scripts/check-appimage-display-backends.sh`, `app/deploy/linux/*-probe.c` | AppImage packaging, host-library probes and packaging checks |
-| `scripts/build-linux-packages.sh`, `app/deploy/linux/nfpm.yaml`, `scripts/check-linux-icons.sh` | `.deb`/`.rpm`/Arch packages built from the AppImage payload; Linux icon checks |
+| `scripts/build-linux-packages.sh`, `scripts/build-linux-deb.sh`, `app/deploy/linux/nfpm.yaml`, `scripts/check-linux-icons.sh` | x86_64 AppImage-derived packages, native ARM64 Ubuntu `.deb`, and Linux icon checks |
 | `.github/workflows/` | `ci.yml` (tests and Linux build checks on pushes and pull requests), `release.yml` (tag-triggered Windows and Linux release, published only after `ci.yml` passes on the tag; starts the pacman repository update), `build-appimage.yml`, and `upstream-common-c.yml` (daily upstream common-c watch) |
 | `wix/`, `app/deploy/`, `scripts/` | Upstream packaging, with fork branding |
 
@@ -107,7 +107,8 @@ Everything else under `app/` is upstream Moonlight code.
 - **Linux icon and packages**: the desktop entry uses `Icon=pyrolight` and the
   icon is installed as `pyrolight` (never `moonlight`, which icon themes
   override); `scripts/check-linux-icons.sh` must pass. Every release ships the
-  AppImage plus `.deb`, `.rpm` and Arch packages of the same payload.
+  x86_64 AppImage plus its `.deb`, `.rpm` and Arch packages, and a native ARM64
+  Ubuntu `.deb` built with the pinned PyroWave runtime.
 
 ## Compatibility
 

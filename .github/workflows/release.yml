@@ -191,6 +191,7 @@ jobs:
             "pyrolight-${{ needs.version.outputs.release_tag }}-windows-x64-portable.zip"
             "pyrolight-${{ needs.version.outputs.release_tag }}-linux-x86_64.AppImage"
             "pyrolight_${{ needs.version.outputs.release_version }}-1_amd64.deb"
+            "pyrolight_${{ needs.version.outputs.release_version }}-1_arm64.deb"
             "pyrolight-${{ needs.version.outputs.release_version }}-1.x86_64.rpm"
             "pyrolight-${{ needs.version.outputs.release_version }}-1-x86_64.pkg.tar.zst"
           )
